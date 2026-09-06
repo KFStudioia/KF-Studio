@@ -756,7 +756,7 @@
     }
 
     // Control de Modal de Leads
-            const SLOTS_BASE = [
+                const SLOTS_BASE = [
       "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00",
       "18:00", "18:30", "19:00", "19:30", "20:00", "20:30"
     ];
@@ -784,26 +784,30 @@
           .eq('fecha_preferida', fechaSeleccionada);
 
         const horasOcupadasMin = (citas || [])
-          .filter(c => c.hora_preferida)
-          .map(c => timeToMinutes(c.hora_preferida));
+          .filter(function(c) { return c.hora_preferida; })
+          .map(function(c) { return timeToMinutes(c.hora_preferida); });
 
         let html = '<option value="">Selecciona una hora disponible...</option>';
 
-        SLOTS_BASE.forEach(slot => {
+        SLOTS_BASE.forEach(function(slot) {
           const slotMin = timeToMinutes(slot);
-          const solapado = horasOcupadasMin.some(ocupadaMin => Math.abs(slotMin - ocupadaMin) < 120);
+          const solapado = horasOcupadasMin.some(function(ocupadaMin) {
+            return Math.abs(slotMin - ocupadaMin) < 120;
+          });
 
           if (solapado) {
-            html += <option value="" disabled style="color: #64748b;"> (Ocupado)</option>;
+            html += '<option value="' + slot + '" disabled style="color: #64748b;">' + slot + ' (Ocupado)</option>';
           } else {
-            html += <option value=""> (Disponible)</option>;
+            html += '<option value="' + slot + '">' + slot + ' (Disponible)</option>';
           }
         });
 
         selectHora.innerHTML = html;
       } catch (err) {
         console.error('Error cargando horarios:', err);
-        selectHora.innerHTML = SLOTS_BASE.map(s => <option value=""> (Disponible)</option>).join('');
+        selectHora.innerHTML = SLOTS_BASE.map(function(s) {
+          return '<option value="' + s + '">' + s + ' (Disponible)</option>';
+        }).join('');
       }
     }
 
