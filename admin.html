@@ -1,0 +1,664 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KF Studio | Panel Privado de Control</title>
+  
+  <!-- Google Fonts & Font Awesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-card: rgba(18, 24, 38, 0.85);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --wa-color: #25d366;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+    }
+
+    /* PANTALLA DE LOGIN / PIN */
+    #authOverlay {
+      position: fixed;
+      inset: 0;
+      background: #090d16;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    }
+
+    .auth-logo {
+      height: 80px;
+      margin-bottom: 20px;
+      object-fit: contain;
+    }
+
+    .auth-card h2 {
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+    }
+
+    .auth-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    .pin-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 14px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1.2rem;
+      text-align: center;
+      letter-spacing: 4px;
+      outline: none;
+      margin-bottom: 16px;
+    }
+
+    .pin-input:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-login:hover {
+      background: var(--primary-hover);
+    }
+
+    /* HEADER */
+    header {
+      border-bottom: 1px solid var(--border-color);
+      padding: 16px 0;
+      background: rgba(9, 13, 22, 0.8);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      height: 45px;
+      object-fit: contain;
+    }
+
+    .brand-title h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .brand-title span {
+      font-size: 0.8rem;
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-action.logout:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--accent-red);
+      color: #f87171;
+    }
+
+    /* METRICS GRID */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .metric-card .label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .metric-card .value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    /* FILTERS BAR */
+    .filter-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 240px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .filter-select {
+      background: #111827;
+      border: 1px solid var(--border-color);
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    /* TABLE SECTION */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge.canal-meet { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge.canal-presencial { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+    .badge.canal-tel { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    .status-select {
+      background: #111827;
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .action-icons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .icon-btn.wa:hover {
+      background: rgba(37, 211, 102, 0.15);
+      border-color: var(--wa-color);
+      color: var(--wa-color);
+    }
+
+    .icon-btn.del:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    /* EMPTY / LOADING STATE */
+    .empty-state {
+      padding: 50px 20px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PANTALLA DE ACCESO POR PIN -->
+  <div id="authOverlay">
+    <div class="auth-card">
+      <img src="logo.jpeg" alt="KF Studio" class="auth-logo" />
+      <h2>Panel de Control</h2>
+      <p>Introduce tu clave de acceso para gestionar citas y clientes.</p>
+      <form onsubmit="verificarPin(event)">
+        <input type="password" id="pinInput" class="pin-input" placeholder="••••" required autofocus />
+        <button type="submit" class="btn-login">Entrar al Panel</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="container header-content">
+      <div class="brand-group">
+        <img src="logo.jpeg" alt="KF Studio" class="brand-logo" />
+        <div class="brand-title">
+          <h1>KF Studio • Panel Privado</h1>
+          <span><i class="fa-solid fa-circle" style="font-size: 7px;"></i> Sistema en Línea 24/7</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button onclick="cargarSolicitudes()" class="btn-action">
+          <i class="fa-solid fa-rotate"></i> Refrescar
+        </button>
+        <a href="index.html" target="_blank" class="btn-action">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver Web
+        </a>
+        <button onclick="cerrarSesion()" class="btn-action logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Salir
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- MÉTRICAS -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="label">Total Solicitudes <i class="fa-solid fa-users" style="color: var(--primary);"></i></div>
+        <div class="value" id="metricTotal">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Nuevas por Contactar <i class="fa-solid fa-bell" style="color: var(--accent-amber);"></i></div>
+        <div class="value" id="metricNuevas" style="color: var(--accent-amber);">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Citas Programadas <i class="fa-solid fa-calendar-check" style="color: var(--accent-purple);"></i></div>
+        <div class="value" id="metricCitas" style="color: var(--accent-purple);">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Completadas <i class="fa-solid fa-circle-check" style="color: var(--accent-green);"></i></div>
+        <div class="value" id="metricCompletadas" style="color: var(--accent-green);">0</div>
+      </div>
+    </section>
+
+    <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+    <section class="filter-bar">
+      <input type="text" id="searchInput" class="search-input" placeholder="Buscar por cliente, empresa, email o teléfono..." oninput="filtrarTabla()" />
+      <select id="filterEstado" class="filter-select" onchange="filtrarTabla()">
+        <option value="">Todos los Estados</option>
+        <option value="nueva">Nuevas</option>
+        <option value="contactada">Contactadas</option>
+        <option value="completada">Completadas</option>
+        <option value="cancelada">Canceladas</option>
+      </select>
+      <select id="filterCanal" class="filter-select" onchange="filtrarTabla()">
+        <option value="">Todos los Canales</option>
+        <option value="Videollamada">Videollamada</option>
+        <option value="Presencial">Presencial</option>
+        <option value="Teléfono">Teléfono</option>
+      </select>
+    </section>
+
+    <!-- TABLA DE GESTIÓN -->
+    <section class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente / Empresa</th>
+            <th>Contacto</th>
+            <th>Canal</th>
+            <th>Fecha y Hora</th>
+            <th>Mensaje</th>
+            <th>Estado</th>
+            <th style="text-align: right;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="solicitudesTbody">
+          <tr>
+            <td colspan="7" class="empty-state">
+              <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
+              <div>Cargando solicitudes desde Supabase...</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    // 1. Configuración de Seguridad
+    const MASTER_PIN = "kf2026"; // Clave de acceso al panel
+    const SUPABASE_URL = "https://flqtvimargbcdkxeqgor.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_OUQHI1hGWOkEzi8pKub0lw_zH3Dd_o4";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let solicitudesCache = [];
+
+    // 2. Control de Acceso
+    function verificarPin(e) {
+      if (e) e.preventDefault();
+      const pin = document.getElementById('pinInput').value.trim();
+      if (pin === MASTER_PIN) {
+        sessionStorage.setItem('kf_admin_auth', 'true');
+        document.getElementById('authOverlay').style.display = 'none';
+        cargarSolicitudes();
+      } else {
+        alert('Clave de acceso incorrecta.');
+        document.getElementById('pinInput').value = '';
+      }
+    }
+
+    function cerrarSesion() {
+      sessionStorage.removeItem('kf_admin_auth');
+      location.reload();
+    }
+
+    // Auto-login si ya inició sesión en la pestaña
+    if (sessionStorage.getItem('kf_admin_auth') === 'true') {
+      document.getElementById('authOverlay').style.display = 'none';
+      cargarSolicitudes();
+    }
+
+    // 3. Cargar Datos desde Supabase
+    async function cargarSolicitudes() {
+      const tbody = document.getElementById('solicitudesTbody');
+      try {
+        const { data, error } = await supabaseClient
+          .from('solicitudes_auditoria')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (error) throw error;
+        solicitudesCache = data || [];
+        actualizarMetricas();
+        renderizarTabla(solicitudesCache);
+      } catch (err) {
+        console.error('Error cargando solicitudes:', err);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color: var(--accent-red);"><i class="fa-solid fa-triangle-exclamation"></i> Error al conectar con Supabase.</td></tr>`;
+      }
+    }
+
+    // 4. Actualizar Métricas
+    function actualizarMetricas() {
+      document.getElementById('metricTotal').textContent = solicitudesCache.length;
+      document.getElementById('metricNuevas').textContent = solicitudesCache.filter(s => s.estado === 'nueva').length;
+      document.getElementById('metricCitas').textContent = solicitudesCache.filter(s => s.fecha_preferida).length;
+      document.getElementById('metricCompletadas').textContent = solicitudesCache.filter(s => s.estado === 'completada').length;
+    }
+
+    // 5. Renderizar Tabla
+    function renderizarTabla(lista) {
+      const tbody = document.getElementById('solicitudesTbody');
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 8px;"></i><div>No se encontraron solicitudes registradas.</div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = lista.map(item => {
+        // Formatear WhatsApp
+        const cleanPhone = (item.telefono || '').replace(/\D/g, '');
+        const waLink = cleanPhone ? `https://wa.me/${cleanPhone}` : '#';
+
+        // Badge de canal
+        let canalBadge = `<span class="badge canal-meet"><i class="fa-solid fa-video"></i> ${item.canal || 'Videollamada'}</span>`;
+        if ((item.canal || '').includes('Presencial')) {
+          canalBadge = `<span class="badge canal-presencial"><i class="fa-solid fa-handshake"></i> Presencial</span>`;
+        } else if ((item.canal || '').includes('Teléfono') || (item.canal || '').includes('Telefono')) {
+          canalBadge = `<span class="badge canal-tel"><i class="fa-solid fa-phone"></i> Teléfono</span>`;
+        }
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: #fff;">${item.nombre || 'Sin nombre'}</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">${item.empresa || 'Particular'}</div>
+            </td>
+            <td>
+              <div><a href="mailto:${item.email}" style="color: #60a5fa; text-decoration: none;">${item.email || ''}</a></div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">${item.telefono || 'Sin teléfono'}</div>
+            </td>
+            <td>${canalBadge}</td>
+            <td>
+              <div style="font-weight: 600;">${item.fecha_preferida || 'Sin fecha'}</div>
+              <div style="font-size: 0.8rem; color: #93c5fd;">${item.hora_preferida ? item.hora_preferida + ' h' : ''}</div>
+            </td>
+            <td style="max-width: 220px; font-size: 0.85rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.mensaje || ''}">
+              ${item.mensaje || '—'}
+            </td>
+            <td>
+              <select class="status-select" onchange="cambiarEstado(${item.id}, this.value)">
+                <option value="nueva" ${item.estado === 'nueva' ? 'selected' : ''}>🟡 Nueva</option>
+                <option value="contactada" ${item.estado === 'contactada' ? 'selected' : ''}>🔵 Contactada</option>
+                <option value="completada" ${item.estado === 'completada' ? 'selected' : ''}>🟢 Completada</option>
+                <option value="cancelada" ${item.estado === 'cancelada' ? 'selected' : ''}>🔴 Cancelada</option>
+              </select>
+            </td>
+            <td style="text-align: right;">
+              <div class="action-icons" style="justify-content: flex-end;">
+                ${cleanPhone ? `<a href="${waLink}" target="_blank" class="icon-btn wa" title="Abrir WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+                <button onclick="eliminarSolicitud(${item.id}, '${item.nombre || ''}')" class="icon-btn del" title="Eliminar y liberar horario"><i class="fa-solid fa-trash-can"></i></button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 6. Cambiar Estado en Supabase
+    async function cambiarEstado(id, nuevoEstado) {
+      try {
+        const { error } = await supabaseClient
+          .from('solicitudes_auditoria')
+          .update({ estado: nuevoEstado })
+          .eq('id', id);
+
+        if (error) throw error;
+        const item = solicitudesCache.find(s => s.id === id);
+        if (item) item.estado = nuevoEstado;
+        actualizarMetricas();
+      } catch (err) {
+        alert('Error al actualizar el estado.');
+        cargarSolicitudes();
+      }
+    }
+
+    // 7. Eliminar Cita (Libera el hueco de 2 horas en la web)
+    async function eliminarSolicitud(id, nombre) {
+      const confirmar = confirm(`¿Estás seguro de eliminar la cita de "${nombre}"?\n\nEsto liberará automáticamente el horario en la web.`);
+      if (!confirmar) return;
+
+      try {
+        const { error } = await supabaseClient
+          .from('solicitudes_auditoria')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        solicitudesCache = solicitudesCache.filter(s => s.id !== id);
+        actualizarMetricas();
+        renderizarTabla(solicitudesCache);
+      } catch (err) {
+        alert('Error al eliminar la solicitud.');
+      }
+    }
+
+    // 8. Buscador y Filtros
+    function filtrarTabla() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const estadoFiltro = document.getElementById('filterEstado').value;
+      const canalFiltro = document.getElementById('filterCanal').value.toLowerCase();
+
+      const resultado = solicitudesCache.filter(item => {
+        const matchQ = !q || (item.nombre || '').toLowerCase().includes(q) ||
+                             (item.empresa || '').toLowerCase().includes(q) ||
+                             (item.email || '').toLowerCase().includes(q) ||
+                             (item.telefono || '').toLowerCase().includes(q);
+
+        const matchEstado = !estadoFiltro || item.estado === estadoFiltro;
+        const matchCanal = !canalFiltro || (item.canal || '').toLowerCase().includes(canalFiltro);
+
+        return matchQ && matchEstado && matchCanal;
+      });
+
+      renderizarTabla(resultado);
+    }
+  </script>
+</body>
+</html>
