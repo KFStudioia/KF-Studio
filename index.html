@@ -631,16 +631,34 @@
           <label>Teléfono (WhatsApp)</label>
           <input type="tel" id="leadTelefono" placeholder="+34 600 000 000" />
         </div>
+        <div class="form-group">
+          <label>Canal preferido para la sesión *</label>
+          <select id="leadCanal" required>
+            <option value="Videollamada (Google Meet)">Videollamada (Google Meet / Online)</option>
+            <option value="Reunión Presencial">Reunión Presencial</option>
+            <option value="Llamada Telefónica">Llamada Telefónica</option>
+          </select>
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div class="form-group">
-            <label>Fecha preferida</label>
-            <input type="date" id="leadFecha" />
+            <label>Fecha preferida *</label>
+            <input type="date" id="leadFecha" required onchange="cargarHorariosDisponibles(this.value)" />
           </div>
           <div class="form-group">
-            <label>Hora preferida</label>
-            <input type="time" id="leadHora" />
+            <label>Hora disponible *</label>
+            <select id="leadHora" required>
+              <option value="">Elige primero una fecha...</option>
+            </select>
           </div>
         </div>
+        <div class="form-group">
+          <label>Mensaje / Necesidades del proyecto</label>
+          <textarea id="leadMensaje" placeholder="Cuéntanos brevemente qué proceso te gustaría automatizar..."></textarea>
+        </div>
+        <button type="submit" id="btnSubmitLead" class="form-submit">Confirmar y Solicitar Auditoría</button>
+      </form>
+    </div>
+  </div>
         <div class="form-group">
           <label>Mensaje / Necesidades del proyecto</label>
           <textarea id="leadMensaje" placeholder="Cuéntanos brevemente qué proceso te gustaría automatizar..."></textarea>
@@ -738,12 +756,70 @@
     }
 
     // Control de Modal de Leads
-        function openModal() {
-      document.getElementById('leadModal').classList.add('active');
+            const SLOTS_BASE = [
+      "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00",
+      "18:00", "18:30", "19:00", "19:30", "20:00", "20:30"
+    ];
+
+    function timeToMinutes(timeStr) {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    }
+
+    async function cargarHorariosDisponibles(fechaSeleccionada) {
+      const selectHora = document.getElementById('leadHora');
+      if (!selectHora) return;
+      if (!fechaSeleccionada) {
+        selectHora.innerHTML = '<option value="">Elige primero una fecha...</option>';
+        return;
+      }
+
+      selectHora.innerHTML = '<option value="">Consultando disponibilidad...</option>';
+
+      try {
+        const { data: citas, error } = await supabaseClient
+          .from('solicitudes_auditoria')
+          .select('hora_preferida')
+          .eq('fecha_preferida', fechaSeleccionada);
+
+        const horasOcupadasMin = (citas || [])
+          .filter(c => c.hora_preferida)
+          .map(c => timeToMinutes(c.hora_preferida));
+
+        let html = '<option value="">Selecciona una hora disponible...</option>';
+
+        SLOTS_BASE.forEach(slot => {
+          const slotMin = timeToMinutes(slot);
+          const solapado = horasOcupadasMin.some(ocupadaMin => Math.abs(slotMin - ocupadaMin) < 120);
+
+          if (solapado) {
+            html += <option value="" disabled style="color: #64748b;"> (Ocupado)</option>;
+          } else {
+            html += <option value=""> (Disponible)</option>;
+          }
+        });
+
+        selectHora.innerHTML = html;
+      } catch (err) {
+        console.error('Error cargando horarios:', err);
+        selectHora.innerHTML = SLOTS_BASE.map(s => <option value=""> (Disponible)</option>).join('');
+      }
+    }
+
+    function openModal() {
+      const modal = document.getElementById('leadModal');
+      if (modal) modal.classList.add('active');
+      const inputFecha = document.getElementById('leadFecha');
+      if (inputFecha) {
+        const today = new Date().toISOString().split('T')[0];
+        inputFecha.min = today;
+      }
     }
 
     function closeModal() {
-      document.getElementById('leadModal').classList.remove('active');
+      const modal = document.getElementById('leadModal');
+      if (modal) modal.classList.remove('active');
     }
 
     function showModalAlert(message, isError = false) {
@@ -762,7 +838,7 @@
       alertBox.textContent = message;
     }
 
-                        async function handleLeadSubmit(e) {
+    async function handleLeadSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSubmitLead');
       const alertBox = document.getElementById('modalAlert');
@@ -772,6 +848,7 @@
       const empresa = document.getElementById('leadEmpresa') ? document.getElementById('leadEmpresa').value.trim() : '';
       const email = document.getElementById('leadEmail') ? document.getElementById('leadEmail').value.trim() : '';
       const telefono = document.getElementById('leadTelefono') ? document.getElementById('leadTelefono').value.trim() : '';
+      const canal = document.getElementById('leadCanal') ? document.getElementById('leadCanal').value : 'Videollamada';
       const fecha = document.getElementById('leadFecha') && document.getElementById('leadFecha').value ? document.getElementById('leadFecha').value : '';
       const hora = document.getElementById('leadHora') && document.getElementById('leadHora').value ? document.getElementById('leadHora').value : '';
       const mensaje = document.getElementById('leadMensaje') ? document.getElementById('leadMensaje').value.trim() : '';
@@ -787,6 +864,11 @@
         return;
       }
 
+      if (!fecha || !hora) {
+        showModalAlert('Por favor, selecciona una fecha y hora disponibles.', true);
+        return;
+      }
+
       btn.disabled = true;
       const originalBtnText = btn.textContent;
       btn.textContent = 'Enviando solicitud...';
@@ -796,8 +878,9 @@
         empresa: empresa || '',
         email: email,
         telefono: telefono || '',
-        fecha_preferida: fecha || '',
-        hora_preferida: hora || '',
+        canal: canal,
+        fecha_preferida: fecha,
+        hora_preferida: hora,
         mensaje: mensaje || ''
       };
 
@@ -811,13 +894,14 @@
               empresa: empresa || null,
               email: email,
               telefono: telefono || null,
-              fecha_preferida: fecha || null,
-              hora_preferida: hora || null,
+              canal: canal,
+              fecha_preferida: fecha,
+              hora_preferida: hora,
               mensaje: mensaje || null
             }
           ]);
 
-        // 2. Disparar a Make para Telegram en tiempo real
+        // 2. Disparar a Make / Telegram en tiempo real
         try {
           await fetch('https://hook.eu1.make.com/eu57y5fiy54hnjtjlxs7w92hpbhdmgwm', {
             method: 'POST',
@@ -835,6 +919,7 @@
         showModalAlert('¡Solicitud enviada con éxito! Nos pondremos en contacto contigo.', false);
         const form = document.getElementById('auditForm');
         if (form) form.reset();
+        document.getElementById('leadHora').innerHTML = '<option value="">Elige primero una fecha...</option>';
 
         setTimeout(() => {
           closeModal();
