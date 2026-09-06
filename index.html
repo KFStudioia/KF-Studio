@@ -762,7 +762,7 @@
       alertBox.textContent = message;
     }
 
-    async function handleLeadSubmit(e) {
+                        async function handleLeadSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSubmitLead');
       const alertBox = document.getElementById('modalAlert');
@@ -772,8 +772,8 @@
       const empresa = document.getElementById('leadEmpresa') ? document.getElementById('leadEmpresa').value.trim() : '';
       const email = document.getElementById('leadEmail') ? document.getElementById('leadEmail').value.trim() : '';
       const telefono = document.getElementById('leadTelefono') ? document.getElementById('leadTelefono').value.trim() : '';
-      const fecha = document.getElementById('leadFecha') && document.getElementById('leadFecha').value ? document.getElementById('leadFecha').value : null;
-      const hora = document.getElementById('leadHora') && document.getElementById('leadHora').value ? document.getElementById('leadHora').value : null;
+      const fecha = document.getElementById('leadFecha') && document.getElementById('leadFecha').value ? document.getElementById('leadFecha').value : '';
+      const hora = document.getElementById('leadHora') && document.getElementById('leadHora').value ? document.getElementById('leadHora').value : '';
       const mensaje = document.getElementById('leadMensaje') ? document.getElementById('leadMensaje').value.trim() : '';
 
       if (!nombre) {
@@ -791,8 +791,19 @@
       const originalBtnText = btn.textContent;
       btn.textContent = 'Enviando solicitud...';
 
+      const leadData = {
+        nombre: nombre,
+        empresa: empresa || '',
+        email: email,
+        telefono: telefono || '',
+        fecha_preferida: fecha || '',
+        hora_preferida: hora || '',
+        mensaje: mensaje || ''
+      };
+
       try {
-        const { data, error } = await supabaseClient
+        // 1. Guardar en Supabase
+        await supabaseClient
           .from('solicitudes_auditoria')
           .insert([
             {
@@ -800,14 +811,27 @@
               empresa: empresa || null,
               email: email,
               telefono: telefono || null,
-              fecha_preferida: fecha,
-              hora_preferida: hora,
+              fecha_preferida: fecha || null,
+              hora_preferida: hora || null,
               mensaje: mensaje || null
             }
           ]);
 
-        if (error) throw error;
+        // 2. Disparar a Make para Telegram en tiempo real
+        try {
+          await fetch('https://hook.eu1.make.com/eu57y5fiy54hnjtjlxs7w92hpbhdmgwm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...leadData,
+              record: leadData
+            })
+          });
+        } catch (eMake) {
+          console.warn('Aviso Make:', eMake);
+        }
 
+        // 3. Confirmacion de exito y reseteo
         showModalAlert('¡Solicitud enviada con éxito! Nos pondremos en contacto contigo.', false);
         const form = document.getElementById('auditForm');
         if (form) form.reset();
@@ -818,12 +842,13 @@
         }, 2200);
 
       } catch (err) {
-        console.error('Error al insertar en solicitudes_auditoria:', err);
+        console.error('Error al insertar:', err);
         showModalAlert('No se ha podido enviar la solicitud. Por favor, inténtalo de nuevo.', true);
       } finally {
         btn.disabled = false;
         btn.textContent = originalBtnText;
       }
-    }</script>
+    }
+</script>
 </body>
 </html>
